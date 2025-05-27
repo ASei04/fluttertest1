@@ -1,40 +1,10 @@
 import 'package:flutter/material.dart';
 import 'my_home_page.dart'; // 追加
+import 'notification_service.dart';
 
 void main() {
+  NotificationService().init();
   runApp(const MyApp());
-}
-
-class Task {
-  String id;
-  String title;
-  DateTime? dueDate;
-  String memo;
-  bool isCompleted;
-
-  Task({
-    required this.id,
-    required this.title,
-    this.dueDate,
-    this.memo = '',
-    this.isCompleted = false,
-  });
-
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'title': title,
-    'dueDate': dueDate?.toIso8601String(),
-    'memo': memo,
-    'isCompleted': isCompleted,
-  };
-
-  factory Task.fromJson(Map<String, dynamic> json) => Task(
-    id: json['id'],
-    title: json['title'],
-    dueDate: json['dueDate'] != null ? DateTime.parse(json['dueDate']) : null,
-    memo: json['memo'] ?? '',
-    isCompleted: json['isCompleted'] ?? false,
-  );
 }
 
 class MyApp extends StatelessWidget {

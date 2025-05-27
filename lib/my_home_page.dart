@@ -1,9 +1,12 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:fluttertest1/task_input_widget.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'main.dart'; // Taskクラスを利用
 import 'package:audioplayers/audioplayers.dart';
 import 'package:video_player/video_player.dart';
+import 'notification_service.dart';
+import 'task.dart'; // Taskクラスを利用
+import 'task_list_widget.dart'; // TaskListWidgetを利用
 
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key, required this.title});
@@ -21,12 +24,16 @@ class _MyHomePageState extends State<MyHomePage> {
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _memoController = TextEditingController();
   DateTime? _selectedDueDate;
+  DateTime? _selectedReminderTime; // 追加
+  final TextEditingController _reminderController =
+      TextEditingController(); // 表示用  // 編集用
 
-  // 編集用
   String? _editingTaskId;
   final TextEditingController _editTitleController = TextEditingController();
   final TextEditingController _editMemoController = TextEditingController();
   DateTime? _editDueDate;
+  DateTime? _editReminderTime;
+  final TextEditingController _editReminderController = TextEditingController();
 
   TaskFilter _filter = TaskFilter.all;
 
@@ -65,17 +72,34 @@ class _MyHomePageState extends State<MyHomePage> {
       _editTitleController.text = task.title;
       _editMemoController.text = task.memo;
       _editDueDate = task.dueDate;
+      _editReminderTime = task.reminderTime;
+      _editReminderController.text = task.reminderTime != null
+          ? '${task.reminderTime!.year}/${task.reminderTime!.month}/${task.reminderTime!.day} '
+                '${TimeOfDay.fromDateTime(task.reminderTime!).format(context)}'
+          : '';
     });
   }
 
-  void _saveEditTask(Task task) {
+  void _saveEditTask(Task task) async {
     setState(() {
       task.title = _editTitleController.text;
       task.memo = _editMemoController.text;
       task.dueDate = _editDueDate;
+      task.reminderTime = _editReminderTime;
       _editingTaskId = null;
-      _saveTasks(); // 追加
+      _saveTasks();
     });
+    // リマインダーも更新
+    if (task.reminderTime != null) {
+      await NotificationService().scheduleNotification(
+        id: int.parse(task.id),
+        title: 'リマインダー',
+        body: '${task.title} の時間です',
+        scheduledDate: task.reminderTime!,
+      );
+    } else {
+      await NotificationService().cancelNotification(int.parse(task.id));
+    }
   }
 
   void _cancelEditTask() {
@@ -98,22 +122,33 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
-  void _addTask() {
+  void _addTask() async {
     if (_titleController.text.trim().isEmpty) return;
+    final newTask = Task(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      title: _titleController.text,
+      dueDate: _selectedDueDate,
+      memo: _memoController.text,
+      reminderTime: _selectedReminderTime, // 追加
+    );
     setState(() {
-      _tasks.add(
-        Task(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          title: _titleController.text,
-          dueDate: _selectedDueDate,
-          memo: _memoController.text,
-        ),
-      );
+      _tasks.add(newTask);
       _titleController.clear();
       _memoController.clear();
       _selectedDueDate = null;
-      _saveTasks(); // 追加
+      _selectedReminderTime = null;
+      _reminderController.clear(); // ← これを追加
+      _saveTasks();
     });
+    // ここでリマインダーをスケジューリング
+    if (newTask.reminderTime != null) {
+      await NotificationService().scheduleNotification(
+        id: int.parse(newTask.id),
+        title: 'リマインダー',
+        body: '${newTask.title} の時間です',
+        scheduledDate: newTask.reminderTime!,
+      );
+    }
   }
 
   @override
@@ -247,6 +282,7 @@ class _MyHomePageState extends State<MyHomePage> {
         ? null
         : _tasks.firstWhere((t) => t.id == _editingTaskId);
 
+    var filteredTasks = _filteredTasks;
     return GestureDetector(
       onTap: () async {
         if (_editingTaskId != null) {
@@ -293,158 +329,56 @@ class _MyHomePageState extends State<MyHomePage> {
                   ),
                   const SizedBox(height: 16),
                   // 新規追加テキストボックス
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _titleController,
-                          decoration: const InputDecoration(labelText: 'タイトル'),
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.calendar_today),
-                        onPressed: () => _pickDueDate(context),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.add),
-                        onPressed: _addTask,
-                      ),
-                    ],
+                  TaskInputWidget(
+                    titleController: _titleController,
+                    memoController: _memoController,
+                    reminderController: _reminderController,
+                    selectedDueDate: _selectedDueDate,
+                    selectedReminderTime: _selectedReminderTime,
+                    onPickDueDate: () => _pickDueDate(context),
+                    onAddTask: _addTask,
+                    onClearReminder: () {
+                      setState(() {
+                        _selectedReminderTime = null;
+                        _reminderController.clear();
+                      });
+                    },
+                    onReminderPicked: (reminder) {
+                      setState(() {
+                        _selectedReminderTime = reminder;
+                        _reminderController.text =
+                            '${reminder.year}/${reminder.month}/${reminder.day} ${TimeOfDay.fromDateTime(reminder).format(context)}';
+                      });
+                    },
                   ),
-                  TextField(
-                    controller: _memoController,
-                    decoration: const InputDecoration(labelText: 'メモ（任意）'),
-                  ),
-                  if (_selectedDueDate != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4.0),
-                      child: Text(
-                        '期限: ${_selectedDueDate!.toLocal().toString().split(' ')[0]}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ),
                   const SizedBox(height: 16),
                   Expanded(
-                    child: ListView(
-                      children: _filteredTasks
-                          .map(
-                            (task) => Card(
-                              child: _editingTaskId == task.id
-                                  ? Padding(
-                                      padding: const EdgeInsets.all(8.0),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
-                                            children: [
-                                              Checkbox(
-                                                value: task.isCompleted,
-                                                onChanged: (_) =>
-                                                    _toggleTaskComplete(task),
-                                              ),
-                                              Expanded(
-                                                child: TextField(
-                                                  controller:
-                                                      _editTitleController,
-                                                  decoration:
-                                                      const InputDecoration(
-                                                        labelText: 'タイトル',
-                                                      ),
-                                                ),
-                                              ),
-                                              IconButton(
-                                                icon: const Icon(
-                                                  Icons.calendar_today,
-                                                ),
-                                                onPressed: () =>
-                                                    _pickEditDueDate(context),
-                                              ),
-                                            ],
-                                          ),
-                                          TextField(
-                                            controller: _editMemoController,
-                                            decoration: const InputDecoration(
-                                              labelText: 'メモ（任意）',
-                                            ),
-                                          ),
-                                          if (_editDueDate != null)
-                                            Padding(
-                                              padding: const EdgeInsets.only(
-                                                top: 4.0,
-                                              ),
-                                              child: Text(
-                                                '期限: ${_editDueDate!.toLocal().toString().split(' ')[0]}',
-                                                style: const TextStyle(
-                                                  fontSize: 12,
-                                                  color: Colors.grey,
-                                                ),
-                                              ),
-                                            ),
-                                          Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.end,
-                                            children: [
-                                              TextButton(
-                                                onPressed: () =>
-                                                    _saveEditTask(task),
-                                                child: const Text('保存'),
-                                              ),
-                                              TextButton(
-                                                onPressed: _cancelEditTask,
-                                                child: const Text('キャンセル'),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    )
-                                  : ListTile(
-                                      onTap: () => _startEditTask(task),
-                                      leading: Checkbox(
-                                        value: task.isCompleted,
-                                        onChanged: (_) =>
-                                            _toggleTaskComplete(task),
-                                      ),
-                                      title: Text(
-                                        task.title,
-                                        style: TextStyle(
-                                          decoration: task.isCompleted
-                                              ? TextDecoration.lineThrough
-                                              : null,
-                                        ),
-                                      ),
-                                      subtitle: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          if (task.dueDate != null)
-                                            Text(
-                                              '期限: ${task.dueDate!.toLocal().toString().split(' ')[0]}',
-                                              style: const TextStyle(
-                                                fontSize: 12,
-                                              ),
-                                            ),
-                                          if (task.memo.isNotEmpty)
-                                            Text(
-                                              task.memo.split('\n').first,
-                                              style: const TextStyle(
-                                                fontSize: 12,
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                      trailing: IconButton(
-                                        icon: const Icon(Icons.delete),
-                                        onPressed: () => _deleteTask(task),
-                                      ),
-                                    ),
-                            ),
-                          )
-                          .toList(),
+                    child: TaskListWidget(
+                      tasks: filteredTasks,
+                      editingTaskId: _editingTaskId,
+                      onEdit: _startEditTask,
+                      onToggleComplete: _toggleTaskComplete,
+                      onDelete: _deleteTask,
+                      editTitleController: _editTitleController,
+                      editMemoController: _editMemoController,
+                      editDueDate: _editDueDate,
+                      onPickEditDueDate: () => _pickEditDueDate(context),
+                      onCancelEdit: _cancelEditTask,
+                      onSaveEdit: _saveEditTask,
+                      editReminderTime: _editReminderTime,
+                      editReminderController: _editReminderController,
+                      onEditReminderChanged: (reminder) {
+                        setState(() {
+                          _editReminderTime = reminder;
+                          if (reminder != null) {
+                            _editReminderController.text =
+                                '${reminder.year}/${reminder.month}/${reminder.day} '
+                                '${TimeOfDay.fromDateTime(reminder).format(context)}';
+                          } else {
+                            _editReminderController.clear();
+                          }
+                        });
+                      },
                     ),
                   ),
                 ],
