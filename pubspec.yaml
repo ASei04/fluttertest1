@@ -51,6 +51,10 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
+<<<<<<< HEAD
+=======
+  flutter_local_notifications: ^17.0.0
+>>>>>>> 3a366299f6d1f37fc42c3c83a48afcb55a6caa04
   
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

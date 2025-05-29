@@ -1,5 +1,8 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+<<<<<<< HEAD
 import 'package:permission_handler/permission_handler.dart';
+=======
+>>>>>>> 3a366299f6d1f37fc42c3c83a48afcb55a6caa04
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
 
@@ -21,6 +24,7 @@ class NotificationService {
 
     // iOSの初期設定（必要なら追加）
     const InitializationSettings initializationSettings =
+<<<<<<< HEAD
         InitializationSettings(android: initializationSettingsAndroid);
 
     await flutterLocalNotificationsPlugin.initialize(initializationSettings);
@@ -42,6 +46,13 @@ class NotificationService {
     } else {
       print('通知許可はすでにある');
     }
+=======
+        InitializationSettings(
+      android: initializationSettingsAndroid,
+    );
+
+    await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+>>>>>>> 3a366299f6d1f37fc42c3c83a48afcb55a6caa04
   }
 
   Future<void> scheduleNotification({
@@ -50,12 +61,17 @@ class NotificationService {
     required String body,
     required DateTime scheduledDate,
   }) async {
+<<<<<<< HEAD
     // 通知の許可をリクエスト
     await requestNotificationPermission();
 
     final safeId = id % 0x7FFFFFFF;
     await flutterLocalNotificationsPlugin.zonedSchedule(
       safeId,
+=======
+    await flutterLocalNotificationsPlugin.zonedSchedule(
+      id,
+>>>>>>> 3a366299f6d1f37fc42c3c83a48afcb55a6caa04
       title,
       body,
       tz.TZDateTime.from(scheduledDate, tz.local),
