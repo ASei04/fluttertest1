@@ -167,6 +167,12 @@ class _MyHomePageState extends State<MyHomePage> {
     _videoController.removeListener(_onVideoEnd);
     _videoController.dispose();
     _audioPlayer.dispose();
+    _titleController.dispose();
+    _memoController.dispose();
+    _reminderController.dispose();
+    _editTitleController.dispose();
+    _editMemoController.dispose();
+    _editReminderController.dispose();
     super.dispose();
   }
 

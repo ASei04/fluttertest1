@@ -3,6 +3,9 @@ import 'my_home_page.dart'; // 追加
 import 'notification_service.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  // Initialize the notification service
+  // This is necessary to ensure that the notification service is ready before the app starts
   NotificationService().init();
   runApp(const MyApp());
 }
